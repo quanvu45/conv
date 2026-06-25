@@ -1,0 +1,145 @@
+library IEEE;
+use IEEE.std_logic_1164.all;
+use IEEE.numeric_std.all;
+
+entity top is
+    generic (
+        IMG_WIDTH  : integer := 640;
+        DATA_WIDTH : integer := 8
+    );
+    port (
+        -- Clock và Reset hệ thống
+        clk             : in  std_logic;
+        rst_n           : in  std_logic;
+        
+        -- Cổng kết nối bus Avalon-MM Slave (Nối qua LWH2F Bridge từ HPS)
+        avs_address     : in  std_logic_vector(0 downto 0);
+        avs_read        : in  std_logic;
+        avs_readdata    : out std_logic_vector(31 downto 0);
+        avs_write       : in  std_logic;
+        avs_writedata   : in  std_logic_vector(31 downto 0);
+        
+        -- SỬA THÀNH AVALON-MM MASTER: Cổng đọc từ Input RAM
+        ram_in_address  : out std_logic_vector(19 downto 0);
+        ram_in_read     : out std_logic;
+        ram_in_readdata : in  std_logic_vector(DATA_WIDTH-1 downto 0);
+        
+        -- SỬA THÀNH AVALON-MM MASTER: Cổng ghi vào Output RAM
+        ram_out_address : out std_logic_vector(19 downto 0);
+        ram_out_write   : out std_logic;
+        ram_out_writedata: out std_logic_vector(DATA_WIDTH-1 downto 0);
+		  
+		  ram_in_waitrequest  : in  std_logic;
+		  ram_out_waitrequest : in  std_logic
+    );
+end top;
+
+architecture Behavioral of top is
+
+    -- 1. Khai báo Component packet_manager (Đã cập nhật cổng)
+    component packet_manager is
+        generic (
+            DATA_WIDTH : integer := 8
+        );
+        port (
+            clk             : in  std_logic;
+            rst_n           : in  std_logic;
+            
+            avs_address     : in  std_logic_vector(0 downto 0);
+            avs_read        : in  std_logic;
+            avs_readdata    : out std_logic_vector(31 downto 0);
+            avs_write       : in  std_logic;
+            avs_writedata   : in  std_logic_vector(31 downto 0);
+            
+            ram_in_address  : out std_logic_vector(19 downto 0);
+            ram_in_read     : out std_logic;
+            ram_in_readdata : in  std_logic_vector(DATA_WIDTH-1 downto 0);
+            ram_in_waitrequest  : in  std_logic;
+				
+            ram_out_address : out std_logic_vector(19 downto 0);
+            ram_out_write   : out std_logic;
+            ram_out_writedata: out std_logic_vector(DATA_WIDTH-1 downto 0);
+            ram_out_waitrequest : in  std_logic;
+				
+            conv_data_in    : out std_logic_vector(DATA_WIDTH-1 downto 0);
+            conv_valid_in   : out std_logic;
+            conv_data_out   : in  std_logic_vector(DATA_WIDTH-1 downto 0);
+            conv_valid_out  : in  std_logic
+			   
+			   
+        );
+    end component;
+
+    -- 2. Khai báo Component conv (Lõi xử lý ảnh của bạn)
+    component conv is
+        generic (
+            DATA_WIDTH : integer := 8
+        );
+        port (
+            clk         : in  std_logic;
+            rst_n       : in  std_logic;
+            data_in     : in  std_logic_vector(DATA_WIDTH-1 downto 0);
+            valid_in    : in  std_logic;
+            data_out    : out std_logic_vector(DATA_WIDTH-1 downto 0);
+            valid_out   : out std_logic
+        );
+    end component;
+
+    -- Tín hiệu dây nối nội bộ giữa packet_manager và conv
+    signal conv_data_in_sig   : std_logic_vector(DATA_WIDTH-1 downto 0);
+    signal conv_valid_in_sig  : std_logic;
+    signal conv_data_out_sig  : std_logic_vector(DATA_WIDTH-1 downto 0);
+    signal conv_valid_out_sig : std_logic;
+
+begin
+
+    -- Gắn lõi Quản lý gói tin
+    u_packet_manager : packet_manager
+        generic map (
+            DATA_WIDTH => DATA_WIDTH
+        )
+        port map (
+            clk             => clk,
+            rst_n           => rst_n,
+            
+            -- Nối ra ngoài bus HPS
+            avs_address     => avs_address,
+            avs_read        => avs_read,
+            avs_readdata    => avs_readdata,
+            avs_write       => avs_write,
+            avs_writedata   => avs_writedata,
+            
+            -- Nối ra ngoài khối RAM Input
+            ram_in_address  => ram_in_address,
+            ram_in_read     => ram_in_read,
+            ram_in_readdata => ram_in_readdata,
+            ram_in_waitrequest  => ram_in_waitrequest,
+            -- Nối ra ngoài khối RAM Output
+            ram_out_address => ram_out_address,
+            ram_out_write   => ram_out_write,
+            ram_out_writedata => ram_out_writedata,
+            ram_out_waitrequest => ram_out_waitrequest,
+            -- Nối nội bộ vào lõi conv
+            conv_data_in    => conv_data_in_sig,
+            conv_valid_in   => conv_valid_in_sig,
+            conv_data_out   => conv_data_out_sig,
+            conv_valid_out  => conv_valid_out_sig
+				
+            
+        );
+
+    -- Gắn lõi Xử lý ảnh (Convolution)
+    u_conv : conv
+        generic map (
+            DATA_WIDTH => DATA_WIDTH
+        )
+        port map (
+            clk         => clk,
+            rst_n       => rst_n,
+            data_in     => conv_data_in_sig,
+            valid_in    => conv_valid_in_sig,
+            data_out    => conv_data_out_sig,
+            valid_out   => conv_valid_out_sig
+        );
+
+end Behavioral;

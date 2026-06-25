@@ -1,0 +1,186 @@
+library IEEE;
+use IEEE.std_logic_1164.all;
+use IEEE.numeric_std.all;
+
+entity conv is
+    generic (
+        IMG_WIDTH  : integer := 640;
+        DATA_WIDTH : integer := 8
+    );
+    port (
+        clk        : in  std_logic;
+        rst_n      : in  std_logic;
+        
+        -- Luồng Dữ liệu vào
+        data_in    : in  std_logic_vector(DATA_WIDTH-1 downto 0);
+        valid_in   : in  std_logic;
+        
+        -- Luồng Dữ liệu ra
+        data_out   : out std_logic_vector(DATA_WIDTH-1 downto 0);
+        valid_out  : out std_logic
+    );
+end conv;
+
+architecture Behavioral of conv is
+
+    -- ==========================================
+    -- Khai báo mảng Line Buffer (Quartus tự động Infer ra BRAM M10K)
+    -- ==========================================
+    type line_buf_t is array (0 to IMG_WIDTH-1) of unsigned(DATA_WIDTH-1 downto 0);
+    signal line_buf_1 : line_buf_t;
+    signal line_buf_2 : line_buf_t;
+    
+    signal wr_ptr : integer range 0 to IMG_WIDTH-1;
+    
+    -- Tín hiệu đọc từ RAM
+    signal lb1_rdata, lb2_rdata : unsigned(DATA_WIDTH-1 downto 0);
+    signal data_in_d1           : unsigned(DATA_WIDTH-1 downto 0);
+    signal valid_d1             : std_logic;
+    
+    -- ==========================================
+    -- Khai báo Cửa sổ 3x3 (Thanh ghi dịch)
+    -- ==========================================
+    signal p00, p01, p02 : unsigned(DATA_WIDTH-1 downto 0); -- Hàng trên cùng (Y-2)
+    signal p10, p11, p12 : unsigned(DATA_WIDTH-1 downto 0); -- Hàng giữa (Y-1)
+    signal p20, p21, p22 : unsigned(DATA_WIDTH-1 downto 0); -- Hàng dưới cùng (Y)
+    signal valid_d2      : std_logic;
+    
+    -- ==========================================
+    -- Khai báo tính toán (MAC) - Lọc Gaussian
+    -- ==========================================
+    signal sum_0, sum_1, sum_2 : unsigned(11 downto 0);
+    signal valid_d3            : std_logic;
+    
+    signal total_sum : unsigned(11 downto 0);
+    signal valid_d4  : std_logic;
+    
+    -- ==========================================
+    -- Bộ đếm tọa độ để xử lý viền ảnh
+    -- ==========================================
+    signal col_cnt : integer range 0 to IMG_WIDTH-1;
+    signal row_cnt : integer range 0 to 1023;
+    
+    type int_array_t is array(1 to 4) of integer range 0 to IMG_WIDTH-1;
+    signal col_cnt_p : int_array_t;
+    
+    type row_array_t is array(1 to 4) of integer range 0 to 1023;
+    signal row_cnt_p : row_array_t;
+
+begin
+
+    process(clk, rst_n)
+    begin
+        if rst_n = '0' then
+            wr_ptr <= 0;
+            col_cnt <= 0;
+            row_cnt <= 0;
+            valid_d1 <= '0'; valid_d2 <= '0'; valid_d3 <= '0'; valid_d4 <= '0';
+            data_out <= (others => '0');
+            valid_out <= '0';
+            
+            p00 <= (others=>'0'); p01 <= (others=>'0'); p02 <= (others=>'0');
+            p10 <= (others=>'0'); p11 <= (others=>'0'); p12 <= (others=>'0');
+            p20 <= (others=>'0'); p21 <= (others=>'0'); p22 <= (others=>'0');
+            
+        elsif rising_edge(clk) then
+            -- ==========================================
+            -- STAGE 1: Đọc/Ghi Line Buffers (Độ trễ 1 xung)
+            -- ==========================================
+            valid_d1 <= valid_in;
+            
+            if valid_in = '1' then
+                -- Đọc dữ liệu cũ ra
+                lb1_rdata <= line_buf_1(wr_ptr);
+                lb2_rdata <= line_buf_2(wr_ptr);
+                
+                -- Ghi dữ liệu mới vào
+                line_buf_1(wr_ptr) <= unsigned(data_in);
+                line_buf_2(wr_ptr) <= lb1_rdata; -- Dịch dòng 1 xuống dòng 2
+                
+                -- Tạo trễ 1 xung cho data_in để đồng bộ với độ trễ đọc của RAM
+                data_in_d1 <= unsigned(data_in);
+                
+                -- Theo dõi tọa độ X, Y
+                col_cnt_p(1) <= col_cnt;
+                row_cnt_p(1) <= row_cnt;
+                
+                if col_cnt = IMG_WIDTH - 1 then
+                    col_cnt <= 0;
+                    if row_cnt = 1023 then row_cnt <= 0; else row_cnt <= row_cnt + 1; end if;
+                else
+                    col_cnt <= col_cnt + 1;
+                end if;
+                
+                if wr_ptr = IMG_WIDTH - 1 then
+                    wr_ptr <= 0;
+                else
+                    wr_ptr <= wr_ptr + 1;
+                end if;
+            end if;
+            
+            -- ==========================================
+            -- STAGE 2: Cập nhật Cửa sổ trượt 3x3
+            -- ==========================================
+            valid_d2 <= valid_d1;
+            if valid_d1 = '1' then
+                p02 <= p01; p01 <= p00; p00 <= lb2_rdata;
+                p12 <= p11; p11 <= p10; p10 <= lb1_rdata;
+                p22 <= p21; p21 <= p20; p20 <= data_in_d1;
+                
+                col_cnt_p(2) <= col_cnt_p(1);
+                row_cnt_p(2) <= row_cnt_p(1);
+            end if;
+            
+            -- ==========================================
+            -- STAGE 3: Tính tổng 3 hàng (Multiply - Accumulate)
+            -- Ma trận Gaussian Blur:
+            -- [1  2  1]
+            -- [2  4  2]
+            -- [1  2  1]
+            -- Dùng shift_left thay cho phép nhân để tối ưu logic
+            -- ==========================================
+            valid_d3 <= valid_d2;
+            if valid_d2 = '1' then
+                -- Hàng 0: 1*p02 + 2*p01 + 1*p00
+                sum_0 <= resize(p02, 12) + shift_left(resize(p01, 12), 1) + resize(p00, 12);
+                -- Hàng 1: 2*p12 + 4*p11 + 2*p10
+                sum_1 <= shift_left(resize(p12, 12), 1) + shift_left(resize(p11, 12), 2) + shift_left(resize(p10, 12), 1);
+                -- Hàng 2: 1*p22 + 2*p21 + 1*p20
+                sum_2 <= resize(p22, 12) + shift_left(resize(p21, 12), 1) + resize(p20, 12);
+                
+                col_cnt_p(3) <= col_cnt_p(2);
+                row_cnt_p(3) <= row_cnt_p(2);
+            end if;
+            
+            -- ==========================================
+            -- STAGE 4: Tính Tổng Toàn bộ
+            -- ==========================================
+            valid_d4 <= valid_d3;
+            if valid_d3 = '1' then
+                total_sum <= sum_0 + sum_1 + sum_2;
+                
+                col_cnt_p(4) <= col_cnt_p(3);
+                row_cnt_p(4) <= row_cnt_p(3);
+            end if;
+            
+            -- ==========================================
+            -- STAGE 5: Xuất kết quả
+            -- Tổng trọng số là 16. Chia 16 bằng cách dịch phải 4 bit (lấy từ bit 11 xuống 4)
+            -- ==========================================
+            if valid_d4 = '1' then
+                data_out <= std_logic_vector(total_sum(11 downto 4));
+                
+                -- Rìa bức ảnh (2 cột đầu, 2 hàng đầu) không có đủ dữ liệu 3x3 => Loại bỏ rác
+                if row_cnt_p(4) >= 2 and col_cnt_p(4) >= 2 then
+                    valid_out <= '1';
+                else
+                    valid_out <= '0';
+                end if;
+            else
+                valid_out <= '0';
+            end if;
+            
+        end if;
+    end process;
+
+end Behavioral;

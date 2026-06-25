@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<preferences>
+ <debug showDebugMenu="0" />
+ <systemtable filter="All Interfaces">
+  <columns>
+   <connections preferredWidth="143" />
+   <irq preferredWidth="34" />
+  </columns>
+ </systemtable>
+ <library
+   expandedCategories="Library,Library/Basic Functions,Library/Basic Functions/Simulation; Debug and Verification/Simulation,Project,Library/Basic Functions/Simulation; Debug and Verification,Library/Qsys Interconnect,Library/Qsys Interconnect/Memory-Mapped" />
+ <window width="1920" height="1032" x="0" y="0" />
+ <generation synthesis="VHDL" />
+</preferences>

@@ -1,0 +1,95 @@
+Info: Starting: Create block symbol file (.bsf)
+Info: qsys-generate C:\QUAN\PS_PL_communication\CONV\sys.qsys --block-symbol-file --output-directory=C:\QUAN\PS_PL_communication\CONV\sys --family="Cyclone V" --part=5CSEMA5F31C6
+Progress: Loading CONV/sys.qsys
+Progress: Reading input file
+Progress: Adding clk_0 [clock_source 24.1]
+Progress: Parameterizing module clk_0
+Progress: Adding hps_0 [altera_hps 24.1]
+Progress: Parameterizing module hps_0
+Progress: Adding top_0 [top 1.0]
+Progress: Parameterizing module top_0
+Progress: Building connections
+Progress: Parameterizing connections
+Progress: Validating
+Progress: Done reading input file
+Info: sys.hps_0: HPS Main PLL counter settings: n = 0  m = 73
+Info: sys.hps_0: HPS peripherial PLL counter settings: n = 0  m = 39
+Warning: sys.hps_0: "Configuration/HPS-to-FPGA user 0 clock frequency" (desired_cfg_clk_mhz) requested 100.0 MHz, but only achieved 97.368421 MHz
+Warning: sys.hps_0: 1 or more output clock frequencies cannot be achieved precisely, consider revising desired output clock frequencies.
+Warning: sys.hps_0: HPS model no longer supports simulation for HPS FPGA Bridges.
+Warning: sys.hps_0: ODT is disabled. Enabling ODT (Mode Register 1) may improve signal integrity
+Info: qsys-generate succeeded.
+Info: Finished: Create block symbol file (.bsf)
+Info: 
+Info: Starting: Create HDL design files for synthesis
+Info: qsys-generate C:\QUAN\PS_PL_communication\CONV\sys.qsys --synthesis=VHDL --output-directory=C:\QUAN\PS_PL_communication\CONV\sys\synthesis --family="Cyclone V" --part=5CSEMA5F31C6
+Progress: Loading CONV/sys.qsys
+Progress: Reading input file
+Progress: Adding clk_0 [clock_source 24.1]
+Progress: Parameterizing module clk_0
+Progress: Adding hps_0 [altera_hps 24.1]
+Progress: Parameterizing module hps_0
+Progress: Adding top_0 [top 1.0]
+Progress: Parameterizing module top_0
+Progress: Building connections
+Progress: Parameterizing connections
+Progress: Validating
+Progress: Done reading input file
+Info: sys.hps_0: HPS Main PLL counter settings: n = 0  m = 73
+Info: sys.hps_0: HPS peripherial PLL counter settings: n = 0  m = 39
+Warning: sys.hps_0: "Configuration/HPS-to-FPGA user 0 clock frequency" (desired_cfg_clk_mhz) requested 100.0 MHz, but only achieved 97.368421 MHz
+Warning: sys.hps_0: 1 or more output clock frequencies cannot be achieved precisely, consider revising desired output clock frequencies.
+Warning: sys.hps_0: HPS model no longer supports simulation for HPS FPGA Bridges.
+Warning: sys.hps_0: ODT is disabled. Enabling ODT (Mode Register 1) may improve signal integrity
+Info: sys: Generating "sys" for QUARTUS_SYNTH
+Info: Interconnect is inserted between master hps_0.h2f_lw_axi_master and slave top_0.slave because the master is of type axi and the slave is of type avalon.
+Info: hps_0: "Running  for module: hps_0"
+Info: hps_0: HPS Main PLL counter settings: n = 0  m = 73
+Info: hps_0: HPS peripherial PLL counter settings: n = 0  m = 39
+Warning: hps_0: "Configuration/HPS-to-FPGA user 0 clock frequency" (desired_cfg_clk_mhz) requested 100.0 MHz, but only achieved 97.368421 MHz
+Warning: hps_0: 1 or more output clock frequencies cannot be achieved precisely, consider revising desired output clock frequencies.
+Warning: hps_0: HPS model no longer supports simulation for HPS FPGA Bridges.
+Warning: hps_0: ODT is disabled. Enabling ODT (Mode Register 1) may improve signal integrity
+Info: hps_0: "sys" instantiated altera_hps "hps_0"
+Info: top_0: "sys" instantiated top "top_0"
+Info: avalon_st_adapter: Inserting error_adapter: error_adapter_0
+Info: mm_interconnect_0: "sys" instantiated altera_mm_interconnect "mm_interconnect_0"
+Info: mm_interconnect_1: "sys" instantiated altera_mm_interconnect "mm_interconnect_1"
+Info: rst_controller: "sys" instantiated altera_reset_controller "rst_controller"
+Info: fpga_interfaces: "hps_0" instantiated altera_interface_generator "fpga_interfaces"
+Info: hps_io: "hps_0" instantiated altera_hps_io "hps_io"
+Info: top_0_slave_translator: "mm_interconnect_0" instantiated altera_merlin_slave_translator "top_0_slave_translator"
+Info: hps_0_h2f_lw_axi_master_agent: "mm_interconnect_0" instantiated altera_merlin_axi_master_ni "hps_0_h2f_lw_axi_master_agent"
+Info: top_0_slave_agent: "mm_interconnect_0" instantiated altera_merlin_slave_agent "top_0_slave_agent"
+Info: top_0_slave_agent_rsp_fifo: "mm_interconnect_0" instantiated altera_avalon_sc_fifo "top_0_slave_agent_rsp_fifo"
+Info: router: "mm_interconnect_0" instantiated altera_merlin_router "router"
+Info: router_002: "mm_interconnect_0" instantiated altera_merlin_router "router_002"
+Info: top_0_slave_burst_adapter: "mm_interconnect_0" instantiated altera_merlin_burst_adapter "top_0_slave_burst_adapter"
+Info: Reusing file C:/QUAN/PS_PL_communication/CONV/sys/synthesis/submodules/altera_merlin_address_alignment.sv
+Info: cmd_demux: "mm_interconnect_0" instantiated altera_merlin_demultiplexer "cmd_demux"
+Info: cmd_mux: "mm_interconnect_0" instantiated altera_merlin_multiplexer "cmd_mux"
+Info: rsp_demux: "mm_interconnect_0" instantiated altera_merlin_demultiplexer "rsp_demux"
+Info: rsp_mux: "mm_interconnect_0" instantiated altera_merlin_multiplexer "rsp_mux"
+Info: Reusing file C:/QUAN/PS_PL_communication/CONV/sys/synthesis/submodules/altera_merlin_arbitrator.sv
+Info: avalon_st_adapter: "mm_interconnect_0" instantiated altera_avalon_st_adapter "avalon_st_adapter"
+Info: top_0_ram_in_translator: "mm_interconnect_1" instantiated altera_merlin_master_translator "top_0_ram_in_translator"
+Info: top_0_ram_in_agent: "mm_interconnect_1" instantiated altera_merlin_master_agent "top_0_ram_in_agent"
+Info: hps_0_f2h_sdram0_data_agent: "mm_interconnect_1" instantiated altera_merlin_axi_slave_ni "hps_0_f2h_sdram0_data_agent"
+Info: Reusing file C:/QUAN/PS_PL_communication/CONV/sys/synthesis/submodules/altera_merlin_burst_uncompressor.sv
+Info: Reusing file C:/QUAN/PS_PL_communication/CONV/sys/synthesis/submodules/altera_avalon_sc_fifo.v
+Info: Reusing file C:/QUAN/PS_PL_communication/CONV/sys/synthesis/submodules/altera_merlin_address_alignment.sv
+Info: router: "mm_interconnect_1" instantiated altera_merlin_router "router"
+Info: router_002: "mm_interconnect_1" instantiated altera_merlin_router "router_002"
+Info: cmd_demux: "mm_interconnect_1" instantiated altera_merlin_demultiplexer "cmd_demux"
+Info: cmd_mux: "mm_interconnect_1" instantiated altera_merlin_multiplexer "cmd_mux"
+Info: Reusing file C:/QUAN/PS_PL_communication/CONV/sys/synthesis/submodules/altera_merlin_arbitrator.sv
+Info: rsp_mux: "mm_interconnect_1" instantiated altera_merlin_multiplexer "rsp_mux"
+Info: Reusing file C:/QUAN/PS_PL_communication/CONV/sys/synthesis/submodules/altera_merlin_arbitrator.sv
+Info: hps_0_f2h_sdram0_data_wr_cmd_width_adapter: "mm_interconnect_1" instantiated altera_merlin_width_adapter "hps_0_f2h_sdram0_data_wr_cmd_width_adapter"
+Info: Reusing file C:/QUAN/PS_PL_communication/CONV/sys/synthesis/submodules/altera_merlin_address_alignment.sv
+Info: Reusing file C:/QUAN/PS_PL_communication/CONV/sys/synthesis/submodules/altera_merlin_burst_uncompressor.sv
+Info: border: "hps_io" instantiated altera_interface_generator "border"
+Info: error_adapter_0: "avalon_st_adapter" instantiated error_adapter "error_adapter_0"
+Info: sys: Done "sys" with 31 modules, 90 files
+Info: qsys-generate succeeded.
+Info: Finished: Create HDL design files for synthesis

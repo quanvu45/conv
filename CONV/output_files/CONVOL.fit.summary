@@ -1,0 +1,20 @@
+Fitter Status : Successful - Thu Jun 25 15:31:55 2026
+Quartus Prime Version : 24.1std.0 Build 1077 03/04/2025 SC Lite Edition
+Revision Name : CONVOL
+Top-level Entity Name : sys_top
+Family : Cyclone V
+Device : 5CSEMA5F31C6
+Timing Models : Final
+Logic utilization (in ALMs) : 3,640 / 32,070 ( 11 % )
+Total registers : 7135
+Total pins : 54 / 457 ( 12 % )
+Total virtual pins : 0
+Total block memory bits : 10,294 / 4,065,280 ( < 1 % )
+Total RAM Blocks : 3 / 397 ( < 1 % )
+Total DSP Blocks : 0 / 87 ( 0 % )
+Total HSSI RX PCSs : 0
+Total HSSI PMA RX Deserializers : 0
+Total HSSI TX PCSs : 0
+Total HSSI PMA TX Serializers : 0
+Total PLLs : 0 / 6 ( 0 % )
+Total DLLs : 1 / 4 ( 25 % )

@@ -1,0 +1,209 @@
+library IEEE;
+use IEEE.std_logic_1164.all;
+use IEEE.numeric_std.all;
+
+entity packet_manager is
+    generic (
+        DATA_WIDTH : integer := 8
+    );
+    port (
+        clk             : in  std_logic;
+        rst_n           : in  std_logic;
+        
+        -- Avalon-MM Slave Interface (Dành cho HPS điều khiển)
+        avs_address     : in  std_logic_vector(0 downto 0);
+        avs_read        : in  std_logic;
+        avs_readdata    : out std_logic_vector(31 downto 0);
+        avs_write       : in  std_logic;
+        avs_writedata   : in  std_logic_vector(31 downto 0);
+        
+        -- SỬA LẠI THÀNH AVALON-MM MASTER (Dành cho RAM Input)
+        ram_in_address  : out std_logic_vector(19 downto 0);
+        ram_in_read     : out std_logic;
+        ram_in_readdata : in  std_logic_vector(DATA_WIDTH-1 downto 0);
+		  ram_in_waitrequest : in std_logic; 
+        
+        -- SỬA LẠI THÀNH AVALON-MM MASTER (Dành cho RAM Output)
+        ram_out_address : out std_logic_vector(19 downto 0);
+        ram_out_write   : out std_logic;
+        ram_out_writedata: out std_logic_vector(DATA_WIDTH-1 downto 0);
+        ram_out_waitrequest : in std_logic;
+        -- CONV Interfaces (Giữ nguyên)
+        conv_data_in    : out std_logic_vector(DATA_WIDTH-1 downto 0);
+        conv_valid_in   : out std_logic;
+        conv_data_out   : in  std_logic_vector(DATA_WIDTH-1 downto 0);
+        conv_valid_out  : in  std_logic
+		  
+    );
+end packet_manager;
+
+architecture Behavioral of packet_manager is
+
+    type state_t is (ST_IDLE, ST_READ_HDR, ST_PROCESS, ST_READ_CHKSUM, ST_VERIFY, ST_DONE);
+    signal state : state_t;
+
+    signal reg_ctrl   : std_logic_vector(31 downto 0) := (others => '0');
+    signal reg_status : std_logic_vector(31 downto 0) := (others => '0');
+
+    signal magic_reg    : std_logic_vector(15 downto 0);
+    signal cmd_reg      : std_logic_vector(15 downto 0);
+    signal length_reg   : unsigned(31 downto 0);
+    signal checksum_reg : std_logic_vector(31 downto 0);
+    
+    signal checksum_calc : std_logic_vector(31 downto 0);
+    
+    signal byte_counter    : unsigned(31 downto 0); 
+    signal byte_counter_d1 : unsigned(31 downto 0); 
+    
+    signal out_counter   : unsigned(19 downto 0);
+
+begin
+
+    process(clk, rst_n)
+    begin
+        if rst_n = '0' then
+            reg_ctrl <= (others => '0');
+        elsif rising_edge(clk) then
+            if avs_write = '1' then
+                if avs_address = "0" then
+                    reg_ctrl <= avs_writedata;
+                end if;
+            end if;
+        end if;
+    end process;
+
+    avs_readdata <= reg_ctrl when avs_address = "0" else reg_status;
+
+    -- Thiết lập tín hiệu đọc RAM chuẩn Avalon-MM Master
+    ram_in_address <= std_logic_vector(byte_counter(19 downto 0));
+    ram_in_read    <= '1' when (state /= ST_IDLE and state /= ST_DONE) else '0';
+
+    process(clk, rst_n)
+    begin
+        if rst_n = '0' then
+            state <= ST_IDLE;
+            byte_counter <= (others => '0');
+            byte_counter_d1 <= (others => '0');
+            reg_status <= (others => '0');
+            magic_reg <= (others => '0');
+            cmd_reg <= (others => '0');
+            length_reg <= (others => '0');
+            checksum_reg <= (others => '0');
+            checksum_calc <= (others => '0');
+            conv_data_in <= (others => '0');
+            conv_valid_in <= '0';
+        elsif rising_edge(clk) then
+            byte_counter_d1 <= byte_counter; 
+            conv_valid_in   <= '0';          
+            conv_data_in    <= (others => '0');
+
+            case state is
+                when ST_IDLE =>
+                    byte_counter <= (others => '0');
+                    if reg_ctrl(0) = '1' then 
+                        state <= ST_READ_HDR;
+                        reg_status <= (others => '0'); 
+                    end if;
+
+                when ST_READ_HDR =>
+                    byte_counter <= byte_counter + 1;
+                    
+                    if byte_counter_d1 = to_unsigned(0, 32) then
+                        magic_reg(7 downto 0) <= ram_in_readdata;
+                    elsif byte_counter_d1 = to_unsigned(1, 32) then
+                        magic_reg(15 downto 8) <= ram_in_readdata;
+                    elsif byte_counter_d1 = to_unsigned(2, 32) then
+                        cmd_reg(7 downto 0) <= ram_in_readdata;
+                    elsif byte_counter_d1 = to_unsigned(3, 32) then
+                        cmd_reg(15 downto 8) <= ram_in_readdata;
+                    elsif byte_counter_d1 = to_unsigned(4, 32) then
+                        length_reg(7 downto 0) <= unsigned(ram_in_readdata);
+                    elsif byte_counter_d1 = to_unsigned(5, 32) then
+                        length_reg(15 downto 8) <= unsigned(ram_in_readdata);
+                    elsif byte_counter_d1 = to_unsigned(6, 32) then
+                        length_reg(23 downto 16) <= unsigned(ram_in_readdata);
+                    elsif byte_counter_d1 = to_unsigned(7, 32) then
+                        length_reg(31 downto 24) <= unsigned(ram_in_readdata);
+                        
+                        if magic_reg(7 downto 0) = x"55" and ram_in_readdata = x"AA" then
+                            state <= ST_PROCESS;
+                            checksum_calc <= (others => '0');
+                        else
+                            state <= ST_IDLE;
+                            reg_status(1) <= '1'; 
+                        end if;
+                    end if;
+
+                when ST_PROCESS =>
+                    if byte_counter < (length_reg + to_unsigned(8, 32)) then
+                        byte_counter <= byte_counter + 1;
+                    else
+                        state <= ST_READ_CHKSUM;
+                    end if;
+
+                    if byte_counter_d1 >= to_unsigned(8, 32) and byte_counter_d1 < (length_reg + to_unsigned(8, 32)) then
+                        conv_valid_in <= '1';
+                        conv_data_in  <= ram_in_readdata;
+                        checksum_calc(7 downto 0) <= checksum_calc(7 downto 0) xor ram_in_readdata;
+                    end if;
+
+                when ST_READ_CHKSUM =>
+                    if byte_counter < (length_reg + to_unsigned(12, 32)) then
+                        byte_counter <= byte_counter + 1;
+                    end if;
+
+                    if byte_counter_d1 = (length_reg + to_unsigned(8, 32)) then
+                        checksum_reg(7 downto 0) <= ram_in_readdata;
+                    elsif byte_counter_d1 = (length_reg + to_unsigned(9, 32)) then
+                        checksum_reg(15 downto 8) <= ram_in_readdata;
+                    elsif byte_counter_d1 = (length_reg + to_unsigned(10, 32)) then
+                        checksum_reg(23 downto 16) <= ram_in_readdata;
+                    elsif byte_counter_d1 = (length_reg + to_unsigned(11, 32)) then
+                        checksum_reg(31 downto 24) <= ram_in_readdata;
+                        state <= ST_VERIFY;
+                    end if;
+
+                when ST_VERIFY =>
+                    if checksum_calc(7 downto 0) = checksum_reg(7 downto 0) then
+                        reg_status(2) <= '0'; 
+                    else
+                        reg_status(2) <= '1'; 
+                    end if;
+                    state <= ST_DONE;
+
+                when ST_DONE =>
+                    reg_status(0) <= '1'; 
+                    if reg_ctrl(0) = '0' then 
+                        state <= ST_IDLE;
+                    end if;
+
+                when others =>
+                    state <= ST_IDLE;
+            end case;
+        end if;
+    end process;
+
+    process(clk, rst_n)
+    begin
+        if rst_n = '0' then
+            ram_out_address   <= (others => '0');
+            ram_out_writedata <= (others => '0');
+            ram_out_write     <= '0';
+            out_counter       <= (others => '0');
+        elsif rising_edge(clk) then
+            ram_out_write <= '0';
+            
+            if state = ST_IDLE and reg_ctrl(0) = '1' then
+                out_counter <= (others => '0');
+            end if;
+
+            if conv_valid_out = '1' then
+                ram_out_address   <= std_logic_vector(out_counter);
+                ram_out_writedata <= conv_data_out;
+                ram_out_write     <= '1';
+                out_counter       <= out_counter + 1;
+            end if;
+        end if;
+    end process;
+
+end Behavioral;
